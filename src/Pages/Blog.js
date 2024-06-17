@@ -1,73 +1,109 @@
-import React, {Component} from 'react';
-import Tab from 'react-bootstrap/Tab';
-import Container from 'react-bootstrap/Container';
-import {Col, Nav, Row} from "react-bootstrap";
-import s from "../App.css";
+import React, { useEffect, useState } from 'react';
+import { Col, Row } from "react-bootstrap";
+import { Link } from "react-router-dom";
+import { getFirestore, collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import LanguageSelector from '../Components/LanguageSelector';
+import CommentSection from '../Components/CommentSection';
 
-class About extends Component {
-    render() {
-        return (
-            <Container className={s.container}>
-                <Tab.Container id="left-tabs-example" defaultActiveKey="first">
-                    <Row>
-                        <Col sm={3} className={s.firstColumn}>
-                            <Nav variant="pills" className="flex-column mt-2">
-                                <Nav.Item>
-                                    <Nav.Link eventKey="first">Design</Nav.Link>
-                                </Nav.Item>
-                                <Nav.Item>
-                                    <Nav.Link eventKey="second">Team</Nav.Link>
-                                </Nav.Item>
-                                <Nav.Item>
-                                    <Nav.Link eventKey="third">Program</Nav.Link>
-                                </Nav.Item>
-                                <Nav.Item>
-                                    <Nav.Link eventKey="fourth">Frameworks</Nav.Link>
-                                </Nav.Item>
-                                <Nav.Item>
-                                    <Nav.Link eventKey="fifth">Library</Nav.Link>
-                                </Nav.Item>
-                            </Nav>
-                        </Col>
-                        <Col sm={9}>
-                            <Tab.Content>
-                                <Tab.Pane eventKey="first">
-                                    <img className="d-block w-100" src="https://i.pinimg.com/originals/aa/f0/69/aaf069dc6de7618a63de784b70ad4370.jpg" alt="picture one"/>
-                                    <p>
-                                        Lorem
-                                    </p>
-                                </Tab.Pane>
-                                <Tab.Pane eventKey="second">
-                                    <img className="d-block w-100" className="d-block w-100" src="https://images.pexels.com/photos/70577/sunset-birds-flying-sky-70577.jpeg?auto=compress&cs=tinysrgb&w=600" alt="picture two"/>
-                                    <p>
-                                        Lorem
-                                    </p>
-                                </Tab.Pane>
-                                <Tab.Pane eventKey="third">
-                                    <img className="d-block w-100" src="https://s3-alpha.figma.com/hub/file/858291939/14dda654-9bf1-47a5-ba66-904aa3003c6e-cover.png" alt="picture three"/>
-                                    <p>
-                                        Lorem
-                                    </p>
-                                </Tab.Pane>
-                                <Tab.Pane eventKey="fourth">
-                                    <img className="d-block w-100" src="https://ichef.bbci.co.uk/news/999/cpsprodpb/15951/production/_117310488_16.jpg" alt="picture fourth"/>
-                                    <p>
-                                        Lorem
-                                    </p>
-                                </Tab.Pane>
-                                <Tab.Pane eventKey="fifth">
-                                    <img className="d-block w-100" src="https://programminglibrarian.org/sites/default/files/partnerships_2.jpg" alt="picture fifth"/>
-                                    <p>
-                                        Lorem
-                                    </p>
-                                </Tab.Pane>
-                            </Tab.Content>
-                        </Col>
-                    </Row>
-                </Tab.Container>
-            </Container>
-        );
+export default function Blog() {
+    const data = getFirestore();
+    const [posts, setPosts] = useState([]);
+    const [sortBy, setSortBy] = useState(null);
+    const [ratings, setRatings] = useState({});
+    const [selectedCategory, setSelectedCategory] = useState(null);
+    const [selectedLanguage, setSelectedLanguage] = useState('En');
+
+    useEffect(() => {
+        fetchData();
+    }, [sortBy, selectedCategory, selectedLanguage]);
+
+    const collectionRef = collection(data, 'blog');
+
+    const fetchData = async () => {
+        let q = query(collectionRef, sortBy
+            && orderBy("date", sortBy));
+        if (selectedCategory) {
+            q = query(q, where("category" + selectedLanguage, "==", selectedCategory));
+        }
+        const data = await getDocs(q);
+        let postsData = [];
+        data.docs.forEach(doc => {
+            const title = doc.data()['title' + selectedLanguage];
+            const details = doc.data()['details' + selectedLanguage];
+            postsData.push({ id: doc.id, title, details, ...doc.data() });
+        });
+        setPosts(postsData);
     }
-}
 
-export default About;
+    const handleSort = (order) => {
+        setSortBy(order);
+    };
+
+    const handleRating = (postId, rating) => {
+        setRatings(prevRatings => ({
+            ...prevRatings,
+            [postId]: rating
+        }));
+    };
+
+    const handleCategorySelect = (category) => {
+        setSelectedCategory(category);
+    };
+
+    const handleLanguageSelect = (language) => {
+        setSelectedLanguage(language);
+    };
+
+    return (
+        <Row style={{ marginRight: 60 + 'px', marginLeft: 60 + 'px' }}>
+            <Col md="9">
+                <LanguageSelector onSelectLanguage={handleLanguageSelect}/>
+                <div className="d-flex justify-content-end mt-2">
+                    <button onClick={() => handleSort('asc')}
+                            className="btn btn-primary mr-auto">Дата ↑</button>
+                    <button onClick={() => handleSort('desc')}
+                            className="btn btn-primary mx-2">Дата ↓</button>
+                </div>
+                <div className="mt-3 mb-3">
+                    <span className="me-2">Фільтр за категоріями:</span>
+                    <button onClick={() => handleCategorySelect(null)}
+                            className={`btn btn-sm ${selectedCategory === null
+                                ? 'btn-primary' : 'btn-outline-primary'}`}>All</button>
+                    <button onClick={() => handleCategorySelect('Space')}
+                            className={`btn btn-sm ${selectedCategory === 'Space'
+                                ? 'btn-primary' : 'btn-outline-primary'}`}>Space</button>
+                    <button onClick={() => handleCategorySelect('IT')}
+                            className={`btn btn-sm ${selectedCategory === 'IT'
+                                ? 'btn-primary' : 'btn-outline-primary'}`}>IT</button>
+                    <button onClick={() => handleCategorySelect('Biology')}
+                            className={`btn btn-sm ${selectedCategory === 'Biology'
+                                ? 'btn-primary' : 'btn-outline-primary'}`}>Biology</button>
+                </div>
+                {posts.map((post, index) => (
+                    <div className="d-flex align-items-center me-5 m-4" key={index}>
+                        <div className="flex-shrink-0">
+                            <img width={150} height={150} className="mr-3" src={post.image} alt="photo" />
+                        </div>
+                        <div className="flex-grow-1 ms-3">
+                            <Link to={`/post/${post.id}`} style={{ color: "black", textDecoration: "none" }}>
+                                <h5>{post.title}</h5>
+                            </Link>
+                            <p>{post.details}</p>
+                            <p>{post.category}</p>
+                            <div>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                    <span key={star} onClick={() => handleRating(post.id, star)}
+                                          style={{ cursor: 'pointer', color: ratings[post.id] >= star
+                                                  ? 'orange' : 'gray' }}>
+                                        &#9733;
+                                    </span>
+                                ))}
+                            </div>
+                            <CommentSection postId={post.id} />
+                        </div>
+                    </div>
+                ))}
+            </Col>
+        </Row>
+    );
+}
